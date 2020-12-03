@@ -12,7 +12,7 @@ import Firebase
 class TasksViewController: UIViewController {
     var user: User!
     var ref: DatabaseReference!
-    var tasks = Array<Task>()
+    var tasks = [Task]()
 
     @IBOutlet weak var tableView: UITableView!
     
@@ -27,12 +27,12 @@ class TasksViewController: UIViewController {
     override func viewWillAppear(_ animated: Bool) {
         super.viewWillAppear(animated)
         ref.observe(.value) { [weak self] snapshot in
-            var _tasks = Array<Task>()
+            var tasks = [Task]()
             for item in snapshot.children {
-                let task = Task(snapshot: item as! DataSnapshot)
-                _tasks.append(task)
+							guard let snapshot = item as? DataSnapshot, let task = Task(snapshot: snapshot) else { continue }
+							tasks.append(task)
             }
-            self?.tasks = _tasks
+            self?.tasks = tasks
             self?.tableView.reloadData()
         }
     }
@@ -46,8 +46,10 @@ class TasksViewController: UIViewController {
         let alertController = UIAlertController(title: "New task", message: "Add new task", preferredStyle: .alert)
         alertController.addTextField()
         let save = UIAlertAction(title: "Save", style: .default) { [weak self] action in
-            guard let textField = alertController.textFields?.first, textField.text != nil else { return }
-            let task = Task(title: textField.text!, userId: (self?.user.uid)!)
+					guard let textField = alertController.textFields?.first,
+								let text = textField.text,
+								let uid = self?.user.uid else { return }
+            let task = Task(title: text, userId: uid)
             let taskRef = self?.ref.child(task.title.lowercased())
             taskRef?.setValue(task.convertToDictionary())
         }
@@ -91,10 +93,9 @@ extension TasksViewController: UITableViewDelegate, UITableViewDataSource {
     }
     
     func tableView(_ tableView: UITableView, commit editingStyle: UITableViewCell.EditingStyle, forRowAt indexPath: IndexPath) {
-        if editingStyle == .delete {
-            let task = tasks[indexPath.row]
-            task.ref?.removeValue()
-        }
+			if editingStyle != .delete { return }
+			let task = tasks[indexPath.row]
+			task.ref?.removeValue()
     }
     
     func tableView(_ tableView: UITableView, didSelectRowAt indexPath: IndexPath) {
@@ -104,7 +105,6 @@ extension TasksViewController: UITableViewDelegate, UITableViewDataSource {
         
         toggleCompletion(cell, isCompleted: isCompleted)
         task.ref?.updateChildValues(["completed": isCompleted])
-        
     }
     
 }
